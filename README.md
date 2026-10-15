@@ -66,7 +66,7 @@ validates the data, saves it, sends it ONLY to socket #1 (A) and echoes it back 
 | `app/websocket_manager.py` | Tracks online users; sends to one user or broadcasts presence |
 | `app/services/chat_service.py` | Business rules: join/duplicate handling, no self-chat, save and load messages |
 | `app/services/attachment_service.py` | File validation, private storage, upload limits, and attachment authorization |
-| `app/routes/users.py` | `POST /users`, `GET /users`, `GET /users/online` |
+| `app/routes/users.py` | `POST /users`, private-chat `GET /users`, registered-user `GET /users/search`, `GET /users/online` |
 | `app/routes/messages.py` | `GET /messages/{other_user_id}` (loads history and marks it read), `POST /messages/{other_user_id}/read` |
 | `app/routes/attachments.py` | Authenticated attachment upload and download endpoints |
 | `app/routes/ws.py` | `WS /ws/{user_id}` real-time endpoint (added; keeps `main.py` small) |
@@ -134,8 +134,9 @@ so nobody can send "as" someone else.
 
 ## 7. Security limits of this prototype (read before real use)
 
-- **Username = identity.** There is no password. When a username is offline, anyone who types it can claim it.
+- **Username = public profile, not authentication.** There is no password; an existing username can only be resumed with its original random session token. Losing that browser session currently means the account cannot be recovered.
 - The session token is a random secret kept in the browser's `sessionStorage` and stored in plain text in the DB.
+- The chat list is derived from messages involving the authenticated user; opening a profile does not create a conversation. Search returns only public username/online status, and message history is scoped to the authenticated user's ID and selected peer.
 - No rate limiting, no HTTPS, no message encryption; the WebSocket accepts any origin.
 - Online state lives in server memory, so it works for ONE server process only (no `--workers 2`).
 
@@ -145,7 +146,7 @@ so nobody can send "as" someone else.
 3. Authorization checks on every request (already done here: you can only read your own conversations).
 4. HTTPS/WSS, check the `Origin` header, rate-limit messages, add CSRF protection if you use cookies.
 5. PostgreSQL + Alembic migrations, and Redis pub/sub so multiple server processes can deliver messages to each other.
-6. Pagination of history, delivery/read receipts, and tests (pytest).
+6. Pagination of history, delivery/read receipts, and broader tests (pytest).
 
 ## 8. Troubleshooting
 

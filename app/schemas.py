@@ -29,6 +29,13 @@ class UserOut(BaseModel):
     username: str
     is_online: bool = False
     unread_count: int = 0
+    last_message_id: Optional[int] = None
+
+
+class UserSearchOut(BaseModel):
+    id: int
+    username: str
+    is_online: bool = False
 
 
 class JoinResponse(BaseModel):

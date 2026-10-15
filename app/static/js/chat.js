@@ -8,7 +8,12 @@
   const state = {
     me: null,            // { id, username, token }
     users: [],           // other users [{id, username, is_online}]
+    searchResults: [],
+    searchQuery: "",
+    searching: false,
+    searchError: "",
     selectedId: null,    // user we are chatting with
+    selectedUser: null,
     ws: null,
     attempts: 0,
     reconnectTimer: null,
@@ -112,7 +117,12 @@
     state.sending = false;
     setComposerBusy(false);
     sessionStorage.removeItem(SESSION_KEY);
-    Object.assign(state, { me: null, users: [], selectedId: null, unread: {}, ws: null });
+    Object.assign(state, {
+      me: null, users: [], searchResults: [], searchQuery: "", searching: false,
+      searchError: "", selectedId: null, selectedUser: null, unread: {}, ws: null,
+    });
+    $("user-search").value = "";
+    $("sidebar-title").textContent = "Chats";
     $("app").classList.remove("chat-open");
     $("empty-state").classList.remove("hidden");
     $("chat-area").classList.add("hidden");
@@ -154,12 +164,16 @@
 
   function handleIncoming(m) {
     const otherId = m.sender_id === state.me.id ? m.receiver_id : m.sender_id;
+    const peer = state.users.find((user) => user.id === otherId);
+    if (peer && m.id > (peer.last_message_id || 0)) peer.last_message_id = m.id;
     if (otherId === state.selectedId) {
       appendMessage(m);
       if (m.sender_id !== state.me.id) markRead(otherId);
+      else loadUsers();
     } else {
       state.unread[otherId] = (state.unread[otherId] || 0) + 1;
       renderUsers();
+      loadUsers();
     }
   }
 
@@ -167,7 +181,16 @@
   async function loadUsers() {
     if (!state.me) return;
     try {
-      state.users = await api("/users");
+      const previousMessageIds = new Map(
+        state.users.map((user) => [user.id, user.last_message_id || 0]),
+      );
+      state.users = (await api("/users")).map((user) => ({
+        ...user,
+        last_message_id: Math.max(
+          user.last_message_id || 0,
+          previousMessageIds.get(user.id) || 0,
+        ) || null,
+      }));
       state.unread = Object.fromEntries(state.users.map((user) => [user.id, user.unread_count]));
       renderUsers();
       renderHeader();
@@ -178,17 +201,33 @@
 
   function renderUsers() {
     const list = $("user-list");
+    const searching = Boolean(state.searchQuery);
+    const displayedUsers = searching ? state.searchResults : state.users;
     list.innerHTML = "";
-    if (state.users.length === 0) {
+    $("sidebar-title").textContent = searching ? "Search results" : "Chats";
+    if (searching && displayedUsers.length === 0) {
       const li = document.createElement("li");
       li.className = "list-empty";
-      li.textContent = "No other users yet. Open another browser window and join with a different username.";
+      li.textContent = state.searchError
+        || (state.searching ? "Searching users…" : "No matching users found.");
+      list.appendChild(li);
+      return;
+    }
+    if (!searching && displayedUsers.length === 0) {
+      const li = document.createElement("li");
+      li.className = "list-empty";
+      li.textContent = "No chats yet. Search for a user to start a conversation.";
       list.appendChild(li);
       return;
     }
     const sorted = [...state.users].sort((a, b) =>
-      (b.is_online - a.is_online) || a.username.localeCompare(b.username));
-    for (const u of sorted) {
+      ((b.last_message_id || 0) - (a.last_message_id || 0))
+      || (b.is_online - a.is_online)
+      || a.username.localeCompare(b.username));
+    const usersToRender = searching
+      ? [...displayedUsers].sort((a, b) => a.username.localeCompare(b.username))
+      : sorted;
+    for (const u of usersToRender) {
       const li = document.createElement("li");
       li.className = "user-item" + (u.id === state.selectedId ? " active" : "");
       li.addEventListener("click", () => selectUser(u.id));
@@ -210,7 +249,7 @@
       info.append(name, status);
 
       li.append(avatar, info);
-      const unreadCount = state.unread[u.id] || 0;
+      const unreadCount = searching ? 0 : state.unread[u.id] || 0;
       if (unreadCount > 0) {
         const badge = document.createElement("span");
         badge.className = "badge";
@@ -222,8 +261,33 @@
     }
   }
 
+  async function searchUsers(query) {
+    state.searching = true;
+    state.searchError = "";
+    renderUsers();
+    try {
+      const results = await api(`/users/search?q=${encodeURIComponent(query)}`);
+      if (query !== state.searchQuery) return;
+      state.searchResults = results;
+    } catch (error) {
+      if (query !== state.searchQuery) return;
+      if (error.status === 401) {
+        logout("Your session expired. Please join again.");
+        return;
+      }
+      state.searchError = "Could not search users: " + error.message;
+    } finally {
+      if (query === state.searchQuery) {
+        state.searching = false;
+        renderUsers();
+      }
+    }
+  }
+
   function renderHeader() {
-    const u = state.users.find((x) => x.id === state.selectedId);
+    const u = state.users.find((x) => x.id === state.selectedId)
+      || state.searchResults.find((x) => x.id === state.selectedId)
+      || (state.selectedUser && state.selectedUser.id === state.selectedId ? state.selectedUser : null);
     if (!u) return;
     $("peer-avatar").textContent = u.username[0].toUpperCase();
     $("peer-name").textContent = u.username;
@@ -303,6 +367,9 @@
   async function selectUser(id) {
     if (state.selectedId !== id && !state.sending) clearSelectedAttachment();
     state.selectedId = id;
+    state.selectedUser = state.searchResults.find((user) => user.id === id)
+      || state.users.find((user) => user.id === id)
+      || state.selectedUser;
     state.unread[id] = 0;
     $("empty-state").classList.add("hidden");
     $("chat-area").classList.remove("hidden");
@@ -355,9 +422,7 @@
     }
     const meta = document.createElement("div");
     meta.className = "meta";
-    const peer = state.users.find((u) => u.id === m.sender_id);
-    const who = mine ? "You" : (peer ? peer.username : "User");
-    meta.textContent = `${who} · ${formatTime(m.created_at)}`;
+    meta.textContent = formatTime(m.created_at);
 
     if (m.attachment) {
       const attachment = m.attachment;
@@ -649,8 +714,20 @@
   });
 
   $("logout-btn").addEventListener("click", () => logout());
+  $("user-search").addEventListener("input", (event) => {
+    const query = event.currentTarget.value.trim();
+    state.searchQuery = query;
+    state.searchResults = [];
+    state.searchError = "";
+    if (query) searchUsers(query);
+    else {
+      state.searching = false;
+      renderUsers();
+    }
+  });
   $("back-btn").addEventListener("click", () => {
     state.selectedId = null;
+    state.selectedUser = null;
     if (!state.sending) clearSelectedAttachment();
     $("emoji-picker-popover").classList.add("hidden");
     $("emoji-toggle").setAttribute("aria-expanded", "false");

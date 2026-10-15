@@ -1,9 +1,8 @@
 """Business logic. Routes and the WebSocket handler call these functions,
 so the rules live in ONE place."""
 import secrets
-from typing import Callable
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import ConversationRead, Message, User
@@ -18,7 +17,7 @@ class ChatError(Exception):
         self.status_code = status_code
 
 
-def join_user(db: Session, username: str, token: str | None, is_online: Callable[[int], bool]) -> User:
+def join_user(db: Session, username: str, token: str | None) -> User:
     key = username.lower()
     user = db.scalar(select(User).where(User.username_key == key))
 
@@ -29,16 +28,13 @@ def join_user(db: Session, username: str, token: str | None, is_online: Callable
         db.refresh(user)
         return user
 
-    # Existing username: allowed if the browser proves it owns it (same token)...
+    # Existing usernames can only be resumed with their existing session token.
     if token and secrets.compare_digest(token, user.token):
         return user
-    # ...rejected if somebody is using it right now...
-    if is_online(user.id):
-        raise ChatError("That username is currently in use. Please choose another one.", 409)
-    # ...otherwise it's offline: let this person reclaim it (prototype only! see README).
-    user.token = secrets.token_urlsafe(32)
-    db.commit()
-    return user
+    raise ChatError(
+        "This username is already registered. Resume with its existing session or choose another username.",
+        409,
+    )
 
 
 def get_user_by_token(db: Session, token: str) -> User | None:
@@ -54,8 +50,38 @@ def authenticate_ws(db: Session, user_id: int, token: str) -> User | None:
     return None
 
 
-def list_other_users(db: Session, me_id: int) -> list[User]:
-    return list(db.scalars(select(User).where(User.id != me_id).order_by(User.username_key)))
+def search_users(db: Session, me_id: int, query: str) -> list[User]:
+    normalized_query = query.strip().lower()
+    if not normalized_query:
+        return []
+    stmt = (
+        select(User)
+        .where(
+            User.id != me_id,
+            User.username_key.contains(normalized_query, autoescape=True),
+        )
+        .order_by(User.username_key)
+    )
+    return list(db.scalars(stmt))
+
+
+def list_conversations(db: Session, me_id: int) -> list[tuple[User, int]]:
+    peer_id = case(
+        (Message.sender_id == me_id, Message.receiver_id),
+        else_=Message.sender_id,
+    )
+    latest_messages = (
+        select(peer_id.label("peer_id"), func.max(Message.id).label("message_id"))
+        .where(or_(Message.sender_id == me_id, Message.receiver_id == me_id))
+        .group_by(peer_id)
+        .subquery()
+    )
+    stmt = (
+        select(User, latest_messages.c.message_id)
+        .join(latest_messages, User.id == latest_messages.c.peer_id)
+        .order_by(latest_messages.c.message_id.desc(), User.username_key)
+    )
+    return [(user, message_id) for user, message_id in db.execute(stmt)]
 
 
 def get_unread_counts(db: Session, me_id: int) -> dict[int, int]:

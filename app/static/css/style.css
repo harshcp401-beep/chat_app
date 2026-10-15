@@ -52,6 +52,9 @@ button { font: inherit; cursor: pointer; }
 .sidebar { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
 .brand { background: var(--primary); color: #fff; font-size: 22px; font-weight: 700; padding: 20px; }
 .sidebar-title { padding: 14px 20px; font-weight: 600; border-bottom: 1px solid var(--border); }
+.user-search { margin: 12px 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--panel); color: var(--text); font: inherit; }
+.user-search:focus { outline: 2px solid var(--blue); border-color: transparent; }
 .user-list { list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; }
 .user-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; cursor: pointer; }
 .user-item:hover { background: #f7f8fc; }

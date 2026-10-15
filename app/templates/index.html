@@ -27,7 +27,15 @@
   <div id="app" class="app hidden">
     <aside class="sidebar">
       <div class="brand">💬 Chat App</div>
-      <div class="sidebar-title">Users</div>
+      <div id="sidebar-title" class="sidebar-title">Chats</div>
+      <input
+        id="user-search"
+        class="user-search"
+        type="search"
+        placeholder="Search registered users"
+        aria-label="Search registered users"
+        autocomplete="off"
+      />
       <ul id="user-list" class="user-list"></ul>
       <div class="me-box">
         <div><span class="muted">Signed in as</span><br /><strong id="me-name"></strong></div>
@@ -55,7 +63,7 @@
         <header class="chat-header">
           <button id="back-btn" class="back-btn" type="button" aria-label="Back to users">←</button>
           <div id="peer-avatar" class="avatar"></div>
-          <div>git branch
+          <div>
 
             <div id="peer-name" class="peer-name"></div>
             <div id="peer-status" class="peer-status"></div>
