@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat App</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+    🌙 Dark Mode
+  </button>
+
+  <!-- 1) Username entry screen -->
+  <div id="login-screen" class="login hidden">
+    <form id="login-form" class="login-card" autocomplete="off">
+      <div class="login-logo">💬</div>
+      <h1>Chat App</h1>
+      <p class="muted">Pick a username to join the conversation.</p>
+      <input id="username-input" type="text" placeholder="Please enter username" maxlength="20" required autofocus />
+      <button id="login-btn" type="submit">Join chat</button>
+      <p id="login-error" class="error hidden"></p>
+    </form>
+  </div>
+
+  <!-- 2) Main chat screen -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">💬 Chat App</div>
+      <div class="sidebar-title">Users</div>
+      <ul id="user-list" class="user-list"></ul>
+      <div class="me-box">
+        <div><span class="muted">Signed in as</span><br /><strong id="me-name"></strong></div>
+        <button id="logout-btn" class="link-btn" type="button">Leave</button>
+      </div>
+    </aside>
+
+    <main class="chat">
+      <div id="conn-banner" class="banner hidden"></div>
+
+      <!-- Empty state: nobody selected -->
+      <div id="empty-state" class="empty">
+        <div class="empty-icon">💬</div>
+        <h2>No conversation selected</h2>
+        <p class="muted">Choose a user from the list to start chatting.</p>
+      </div>
+
+      <!-- Conversation -->
+      <section
+        id="chat-area"
+        class="chat-area hidden"
+        data-image-max-bytes="{{ image_max_bytes }}"
+        data-file-max-bytes="{{ file_max_bytes }}"
+      >
+        <header class="chat-header">
+          <button id="back-btn" class="back-btn" type="button" aria-label="Back to users">←</button>
+          <div id="peer-avatar" class="avatar"></div>
+          <div>
+            <div id="peer-name" class="peer-name"></div>
+            <div id="peer-status" class="peer-status"></div>
+          </div>
+        </header>
+        <div id="messages" class="messages"></div>
+        <div id="emoji-picker-popover" class="emoji-picker-popover hidden">
+          <emoji-picker id="emoji-picker" aria-label="Choose an emoji"></emoji-picker>
+        </div>
+        <form id="message-form" class="composer" autocomplete="off">
+          <input id="image-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" hidden />
+          <input id="file-input" type="file" accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,.csv,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden />
+          <div id="composer-preview" class="attachment-preview hidden">
+            <img id="attachment-preview-image" class="attachment-preview-image hidden" alt="Selected image preview" />
+            <div class="attachment-preview-details">
+              <strong id="attachment-preview-name"></strong>
+              <span id="attachment-preview-size" class="muted"></span>
+              <progress id="upload-progress" max="100" value="0" class="hidden" aria-label="Upload progress"></progress>
+              <span id="upload-progress-label" class="muted"></span>
+            </div>
+            <button id="cancel-attachment-btn" class="icon-btn cancel-attachment" type="button" aria-label="Cancel attachment">×</button>
+          </div>
+          <div class="composer-controls">
+            <button id="emoji-toggle" class="icon-btn" type="button" aria-label="Choose emoji" aria-expanded="false">😊</button>
+            <button id="image-attach-btn" class="icon-btn" type="button" aria-label="Attach image">🖼️</button>
+            <button id="file-attach-btn" class="icon-btn" type="button" aria-label="Attach file">📎</button>
+            <input id="message-input" type="text" placeholder="Type a message..." maxlength="2000" />
+            <button id="send-btn" type="submit" aria-label="Send">➤</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <div id="image-lightbox" class="image-lightbox hidden" role="dialog" aria-modal="true" aria-label="Image preview">
+    <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close image preview">×</button>
+    <img id="lightbox-image" alt="" />
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>
