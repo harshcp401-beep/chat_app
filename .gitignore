@@ -1,4 +1,7 @@
+git log -1 --oneline
 .venv/
 __pycache__/
 chat.db
 .chat_uploads/
+
+.env
